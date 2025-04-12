@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+ <html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Loader</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+  #quiz-container {
+  margin-top: 20px;
+  }
+  .answer-choice {
+  cursor: pointer;
+  }
+  .correct {
+  background-color: lightgreen;
+  }
+  .incorrect {
+  background-color: lightcoral;
+  }
+  #progress-container {
+  margin-top: 10px;
+  }
+  </style>
+ </head>
+ <body>
+  <div class="container">
+  <h1>Quiz Loader</h1>
+  <div class="mb-3">
+  <label for="htmlFile" class="form-label">Browse HTML Quiz File:</label>
+  <input class="form-control" type="file" id="htmlFile" accept=".html">
+  </div>
+  <div class="mb-3">
+  <label for="numQuestions" class="form-label">Number of Questions for Quiz:</label>
+  <input class="form-control" type="number" id="numQuestions" value="5" min="1">
+  </div>
+  <button class="btn btn-primary" id="loadQuiz">Load Quiz</button>
+ 
+
+  <div id="quiz-container">
+  </div>
+  <div id="progress-container">
+  </div>
+  <div id="result-container" class="mt-3">
+  </div>
+  </div>
+ 
+
+  <script>
+  const htmlFile = document.getElementById('htmlFile');
+  const loadQuizButton = document.getElementById('loadQuiz');
+  const quizContainer = document.getElementById('quiz-container');
+  const resultContainer = document.getElementById('result-container');
+  const progressContainer = document.getElementById('progress-container');
+  const numQuestionsInput = document.getElementById('numQuestions');
+ 
+
+  let quizData = [];
+  let currentQuizQuestions = [];
+  let currentQuestionIndex = 0;
+  let score = 0;
+ 
+
+  // Check for stored file path on page load
+  window.onload = function() {
+  const storedFilePath = localStorage.getItem('quizFilePath');
+  if (storedFilePath) {
+  // You might want to display the stored file name to the user
+  // but you can't directly set the file input value for security reasons.
+  // For example:
+  // htmlFile.labels[0].textContent = `Browse HTML Quiz File: ${storedFilePath.split('\\').pop()}`; 
+  }
+  };
+ 
+
+  loadQuizButton.addEventListener('click', () => {
+  const file = htmlFile.files[0];
+  if (file) {
+  const reader = new FileReader();
+  reader.onload = function(event) {
+  quizContainer.innerHTML = "";
+  extractQuestions(event.target.result);
+  selectQuestions(parseInt(numQuestionsInput.value, 10));
+  loadQuestion();
+  // Store the file path
+  localStorage.setItem('quizFilePath', htmlFile.value);
+  };
+  reader.readAsText(file);
+  } else {
+  alert('Please select an HTML file.');
+  }
+  });
+
+  function reloadQuiz(){
+    const file2 = htmlFile.files[0];
+  if (file2) {
+  const reader2 = new FileReader();
+  reader2.onload = function(event) {
+  quizContainer.innerHTML = "";
+  extractQuestions(event.target.result);
+  selectQuestions(parseInt(numQuestionsInput.value, 10));
+  loadQuestion();
+  // Store the file path
+  localStorage.setItem('quizFilePath', htmlFile.value);
+  };
+  reader.readAsText(file);
+  } else {
+  alert('Please select an HTML file.');
+  }
+  }
+ 
+
+  function extractQuestions(htmlContent) {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent;
+  const questionCards = tempDiv.querySelectorAll('.card');
+  quizData = Array.from(questionCards).map(card => {
+  const questionText = card.querySelector('.card-text').textContent;
+  const answerElements = card.querySelectorAll('.multi-choice-item');
+  const answers = {};
+  answerElements.forEach(answerEl => {
+  const letter = answerEl.querySelector('.multi-choice-letter').textContent.trim().slice(0, 1);
+  answers[letter] = answerEl.textContent.replace(letter + '.', '').trim();
+  });
+  const correctAnswer = card.querySelector('.correct-answer').textContent.trim();
+  return { question: questionText, answers: answers, correctAnswer: correctAnswer };
+  });
+  }
+ 
+
+  function selectQuestions(numQuestions) {
+  currentQuizQuestions = [];
+  const allQuestions = [...quizData];
+  if (numQuestions > allQuestions.length) {
+  numQuestions = allQuestions.length;
+  alert(`There are only ${allQuestions.length} questions. Using all of them.`);
+  numQuestionsInput.value = allQuestions.length;
+  }
+ 
+
+  for (let i = 0; i < numQuestions; i++) {
+  const randomIndex = Math.floor(Math.random() * allQuestions.length);
+  currentQuizQuestions.push(allQuestions[randomIndex]);
+  allQuestions.splice(randomIndex, 1);
+  }
+  currentQuestionIndex = 0;
+  score = 0;
+  }
+ 
+
+  function loadQuestion() {
+  if (currentQuestionIndex < currentQuizQuestions.length) {
+  const currentQuestion = currentQuizQuestions[currentQuestionIndex];
+  quizContainer.innerHTML = `
+  <div class="card p-3 mb-4">
+  <h4>${currentQuestion.question}</h4>
+  <div class="question-choices-container">
+  <ul class="list-group">
+  ${Object.entries(currentQuestion.answers).map(([key, value]) => `
+  <li class="list-group-item answer-choice" data-letter="${key}">${key}. ${value}</li>
+  `).join('')}
+  </ul>
+  </div>
+  <button class="btn btn-primary mt-3" id="next-btn">Next Question</button>
+  </div>
+  `;
+  document.querySelectorAll('.answer-choice').forEach(choice => {
+  choice.addEventListener('click', handleAnswerClick);
+  });
+  document.getElementById('next-btn').addEventListener('click', nextQuestion);
+  updateProgress();
+  } else {
+  displayResults();
+  }
+  }
+ 
+
+  function handleAnswerClick(event) {
+  document.querySelectorAll('.answer-choice').forEach(choice => choice.classList.remove('active'));
+  event.target.classList.add('active');
+  }
+ 
+
+  function nextQuestion() {
+  const selectedAnswer = document.querySelector('.answer-choice.active');
+  if (selectedAnswer) {
+  const chosenLetter = selectedAnswer.getAttribute('data-letter');
+  if (chosenLetter === currentQuizQuestions[currentQuestionIndex].correctAnswer) {
+  score++;
+  }
+  currentQuestionIndex++;
+  loadQuestion();
+  } else {
+  alert('Please select an answer.');
+  }
+  }
+ 
+
+  function updateProgress() {
+  progressContainer.innerText = `Question ${currentQuestionIndex + 1} of ${currentQuizQuestions.length}`;
+  }
+ 
+
+  function displayResults() {
+  quizContainer.innerHTML = "";
+  progressContainer.innerHTML = "";
+  resultContainer.innerHTML = `
+  <h2>You scored ${score} out of ${currentQuizQuestions.length}</h2>
+  <button class="btn btn-secondary" onclick="location.reload()">Reload Quiz</button>
+  `;
+  }
+  </script>
+ </body>
+ </html>
